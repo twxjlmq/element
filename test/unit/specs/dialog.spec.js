@@ -1,4 +1,4 @@
-import { createVue, destroyVM } from '../util';
+import { createVue, destroyVM, waitImmediate } from '../util';
 
 describe('Dialog', () => {
   let vm;
@@ -100,14 +100,14 @@ describe('Dialog', () => {
         };
       }
     }, true);
-    const dialog = vm.$children[0];
-    expect(dialog.$el.style.display).to.equal('none');
+    const dialogEl = vm.$children[0].$el;
+    expect(getComputedStyle(dialogEl).display).to.equal('none');
     vm.visible = true;
     setTimeout(() => {
-      expect(dialog.$el.style.display).to.not.equal('none');
+      expect(getComputedStyle(dialogEl).display).to.not.equal('none');
       vm.visible = false;
       setTimeout(() => {
-        expect(dialog.$el.style.display).to.equal('none');
+        expect(getComputedStyle(dialogEl).display).to.equal('none');
         done();
       }, 400);
     }, 50);
@@ -157,7 +157,9 @@ describe('Dialog', () => {
         <div>
           <el-dialog
             @open="handleOpen"
+            @opened="handleOpened"
             @close="handleClose"
+            @closed="handleClosed"
             :title="title"
             :visible.sync="visible">
             <span>这是一段信息</span>
@@ -170,14 +172,23 @@ describe('Dialog', () => {
           this.state = 'open';
         },
 
+        handleOpened() {
+          this.animationState = 'opened';
+        },
+
         handleClose() {
-          this.state = 'closed';
+          this.state = 'close';
+        },
+
+        handleClosed() {
+          this.animationState = 'closed';
         }
       },
 
       data() {
         return {
           state: '',
+          animationState: '',
           title: 'dialog test',
           visible: false
         };
@@ -186,12 +197,14 @@ describe('Dialog', () => {
     vm.visible = true;
     setTimeout(() => {
       expect(vm.state).to.equal('open');
+      expect(vm.animationState).to.equal('opened');
       vm.visible = false;
       setTimeout(() => {
-        expect(vm.state).to.equal('closed');
+        expect(vm.state).to.equal('close');
+        expect(vm.animationState).to.equal('closed');
         done();
-      }, 50);
-    }, 50);
+      }, 400);
+    }, 400);
   });
   it('click dialog to close', done => {
     vm = createVue({
@@ -275,5 +288,32 @@ describe('Dialog', () => {
         done();
       }, 500);
     }, 10);
+  });
+
+  it('destroyOnClose', async() => {
+    vm = createVue({
+      template: `
+        <div>
+          <el-dialog :title="title" :visible.sync="visible" destroy-on-close>
+            <input />
+          </el-dialog>
+        </div>
+      `,
+
+      data() {
+        return {
+          title: 'dialog test',
+          visible: true
+        };
+      }
+    }, true);
+    const dialog = vm.$children[0];
+    await waitImmediate();
+    dialog.$el.querySelector('input').value = '123';
+    dialog.$el.click();
+    await waitImmediate();
+    vm.visible = true;
+    await waitImmediate();
+    expect(dialog.$el.querySelector('input').value).to.be.equal('');
   });
 });
